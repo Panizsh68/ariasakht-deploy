@@ -1,0 +1,141 @@
+version: "3.8"
+
+services:
+  mongo-primary:
+    image: mongo:6.0
+    container_name: mongo-primary
+    command: >
+      mongod
+      --replSet rs0
+      --keyFile /etc/mongo-keyfile/mongodb-keyfile
+      --bind_ip_all
+      --auth
+    volumes:
+      - mongo-primary-data:/data/db
+      - ./mongo/keyfile/mongodb-keyfile:/etc/mongo-keyfile/mongodb-keyfile:ro
+      - ./mongo/mongod.conf:/etc/mongod.conf:ro
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=shantia_ariaSakht0425
+    healthcheck:
+      test: ["CMD", "mongosh", "--username=admin", "--password=shantia_ariaSakht0425", "--authenticationDatabase=admin", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app-network
+
+  mongo-secondary-1:
+    image: mongo:6.0
+    container_name: mongo-secondary-1
+    command: >
+      mongod
+      --replSet rs0
+      --keyFile /etc/mongo-keyfile/mongodb-keyfile
+      --bind_ip_all
+      --auth
+    volumes:
+      - mongo-secondary-1-data:/data/db
+      - ./mongo/keyfile/mongodb-keyfile:/etc/mongo-keyfile/mongodb-keyfile:ro
+    networks:
+      - app-network
+
+  mongo-secondary-2:
+    image: mongo:6.0
+    container_name: mongo-secondary-2
+    command: >
+      mongod
+      --replSet rs0
+      --keyFile /etc/mongo-keyfile/mongodb-keyfile
+      --bind_ip_all
+      --auth
+    volumes:
+      - mongo-secondary-2-data:/data/db
+      - ./mongo/keyfile/mongodb-keyfile:/etc/mongo-keyfile/mongodb-keyfile:ro
+    networks:
+      - app-network
+
+  mongo-init:
+    image: mongo:6.0
+    container_name: mongo-init
+    depends_on:
+      mongo-primary:
+        condition: service_healthy
+      mongo-secondary-1:
+        condition: service_started
+      mongo-secondary-2:
+        condition: service_started
+    volumes:
+      - ./mongo-init/init-replica.sh:/init-replica.sh:ro
+    entrypoint: ["bash", "/init-replica.sh"]
+    restart: "no"
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7
+    container_name: redis
+    command: redis-server --requirepass shantia_ariaSakht0425
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  backend:
+    container_name: backend
+    build:
+      context: ./pre-shantia
+      dockerfile: Dockerfile
+    env_file:
+      - ./pre-shantia/.env.production
+    depends_on:
+      - mongo-init
+      - redis
+    healthcheck:
+      test: curl --fail http://localhost:3000 || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  frontend:
+    container_name: frontend
+    build:
+      context: ./pre-shantia-front
+      dockerfile: Dockerfile
+    env_file:
+      - ./pre-shantia-front/.env.production
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:1.25.0
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  mongo-primary-data:
+  mongo-secondary-1-data:
+  mongo-secondary-2-data:
+  redis-data:
+
+networks:
+  app-network:
+    driver: bridge
