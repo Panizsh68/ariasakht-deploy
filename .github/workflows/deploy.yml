@@ -20,22 +20,35 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+      - name: Add server to known_hosts
+        run: |
+          ssh-keyscan -H 185.50.38.104 >> ~/.ssh/known_hosts
+
       - name: Deploy to server
         run: |
-          ssh -o StrictHostKeyChecking=no root@185.50.38.104 << 'EOF'
+          ssh root@185.50.38.104 << 'EOF'
+            set -e
             cd /srv/ariasakht
-            git pull origin master
             
-            if [ -f mongo_6_0.tar ]; then
-              docker load -i mongo_6_0.tar
+            # چک کردن فضای دیسک
+            DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' | cut -d'%' -f1)
+            if [ "$DISK_USAGE" -gt 65 ]; then
+              echo "Disk usage is over 65% ($DISK_USAGE%). Pruning Docker..."
+              docker system prune -f --volumes
+            else
+              echo "Disk usage is $DISK_USAGE%, no pruning needed."
             fi
-            if [ -f node_20_alpine.tar ]; then
-              docker load -i node_20_alpine.tar
-            fi
-            if [ -f nginx_alpine.tar ]; then
-              docker load -i nginx_alpine.tar
-            fi
+            
+            # ادامه فرآیند deployment
+            git fetch origin
+            git reset --hard origin/master
 
-            docker-compose -f docker-compose.production.yml down
+            for IMAGE in mongo_6_0 node_20_alpine nginx_alpine; do
+              if [ -f ${IMAGE}.tar ]; then
+                docker load -i ${IMAGE}.tar
+              fi
+            done
+
+            docker-compose -f docker-compose.production.yml down --remove-orphans
             docker-compose -f docker-compose.production.yml up -d --build
           EOF
