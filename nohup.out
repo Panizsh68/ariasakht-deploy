@@ -1,0 +1,4 @@
+2025/09/06 10:31:22 socat[3583866] E bind(5, {AF=2 0.0.0.0:27018}, 16): Address already in use
+2025/09/06 10:31:22 socat[3583865] E bind(5, {AF=2 0.0.0.0:27017}, 16): Address already in use
+2025/09/06 10:31:22 socat[3583867] E bind(5, {AF=2 0.0.0.0:27019}, 16): Address already in use
+2025/09/06 10:33:10 socat[3585286] E bind(5, {AF=2 0.0.0.0:27017}, 16): Address already in use

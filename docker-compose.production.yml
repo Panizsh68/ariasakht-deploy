@@ -4,6 +4,8 @@ services:
   mongo-primary:
     image: mongo:6.0
     container_name: mongo-primary
+    ports:
+      - "27017:27017"
     command: >
       mongod
       --replSet rs0
@@ -28,6 +30,8 @@ services:
   mongo-secondary-1:
     image: mongo:6.0
     container_name: mongo-secondary-1
+    ports:
+      - "27018:27017"
     command: >
       mongod
       --replSet rs0
@@ -43,6 +47,8 @@ services:
   mongo-secondary-2:
     image: mongo:6.0
     container_name: mongo-secondary-2
+    ports:
+      - "27019:27017"
     command: >
       mongod
       --replSet rs0
