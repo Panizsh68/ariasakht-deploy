@@ -8,6 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout code with submodules
@@ -24,31 +25,167 @@ jobs:
         run: |
           ssh-keyscan -H 185.50.38.104 >> ~/.ssh/known_hosts
 
-      - name: Deploy to server
+      - name: Deploy to server (safe disk management)
+        env:
+          SSH_USER: root
+          SSH_HOST: 185.50.38.104
+          DISK_LIMIT: 65
         run: |
-          ssh root@185.50.38.104 << 'EOF'
-            set -e
-            cd /srv/ariasakht
-            
-            # چک کردن فضای دیسک
-            DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' | cut -d'%' -f1)
-            if [ "$DISK_USAGE" -gt 65 ]; then
-              echo "Disk usage is over 65% ($DISK_USAGE%). Pruning Docker..."
-              docker system prune -f --volumes
+          ssh ${SSH_USER}@${SSH_HOST} bash -s <<'EOF'
+            set -euo pipefail
+
+            # ---------- helper ----------
+            info() { printf "\n[INFO] %s\n" "$*"; }
+            warn() { printf "\n[WARN] %s\n" "$*"; }
+            err()  { printf "\n[ERROR] %s\n" "$*" >&2; }
+
+            # Protected volume/name patterns (do NOT remove these)
+            # Add any other volume names you want to protect here
+            PROTECT_VOL_PATTERNS=("ariasakht_mongo" "ariasakht_redis" "api_dbdata" "ops_db_data" "nazarify_db_data" "pre-shantia_mongo" "pre-shantia_redis")
+
+            # Check current disk usage percentage (root fs)
+            get_disk_usage() {
+              df -h / | awk 'NR==2 {print $5}' | tr -d '%'
+            }
+
+            # Check if an image (by ID) is used by any container
+            image_in_use() {
+              local img="$1"
+              if [ -n "$(docker ps -a --filter "ancestor=${img}" -q)" ]; then
+                return 0  # in use
+              else
+                return 1  # not in use
+              fi
+            }
+
+            # Check whether a volume name should be protected
+            is_protected_volume() {
+              local vol="$1"
+              for p in "${PROTECT_VOL_PATTERNS[@]}"; do
+                if [[ "$vol" == *"$p"* ]]; then
+                  return 0
+                fi
+              done
+              return 1
+            }
+
+            info "Deployment starting on $(hostname) at $(date)"
+
+            # 1) quick report
+            info "Initial disk usage: $(get_disk_usage)%"
+            info "Docker summary before pruning:"
+            docker system df || true
+
+            # 2) If over threshold, run safe prune steps
+            DISK_USAGE=$(get_disk_usage)
+            if [ "$DISK_USAGE" -gt "${DISK_LIMIT}" ]; then
+              warn "Disk usage is ${DISK_USAGE}% > ${DISK_LIMIT}%. Running safe prune sequence."
+
+              # a) Clean builder cache (safe)
+              info "Pruning docker build cache..."
+              docker builder prune -af || warn "builder prune failed"
+
+              # b) Remove dangling images
+              info "Pruning dangling images..."
+              docker image prune -f || warn "image prune (dangling) failed"
+
+              # c) Remove images that are not referenced by any container (careful, iterative)
+              info "Removing unused images that are not referenced by any container (safe candidates)..."
+              # We'll attempt up to 3 rounds to free space
+              rounds=0
+              max_rounds=3
+              while [ "$(get_disk_usage)" -gt "${DISK_LIMIT}" ] && [ $rounds -lt $max_rounds ]; do
+                rounds=$((rounds+1))
+                info "Round $rounds: looking for totally-unused images..."
+                # List images (ID Repo:Tag Size)
+                docker images --format '{{.ID}} {{.Repository}}:{{.Tag}} {{.Size}}' | while read -r id repo tag size; do
+                  # Skip images that are <none> handled earlier; check usage
+                  if image_in_use "$id"; then
+                    # still referenced by a container (skip)
+                    continue
+                  fi
+                  # Extra safety: don't delete images with repo names matching protected patterns (e.g. "mongo", "redis", "ariasakht-*")
+                  case "$repo" in
+                    *mongo*|*redis*|*postgres*|*ariasakht*|*aria* )
+                      # protected-ish — skip
+                      continue
+                      ;;
+                    *)
+                      # safe candidate
+                      info "Deleting unused image $id ($repo)"
+                      docker rmi -f "$id" || warn "failed to rmi $id"
+                      ;;
+                  esac
+                done
+                # small pause
+                sleep 1
+              done
+
+              # d) Prune dangling volumes only (safe: removes only volumes not referenced by any container)
+              info "Pruning dangling volumes..."
+              docker volume prune -f || warn "volume prune failed"
+
+              info "Docker summary after prune attempt:"
+              docker system df || true
+              info "Disk usage now $(get_disk_usage)%"
+
+              # e) If still over limit: identify large volumes and present safe removal options
+              if [ "$(get_disk_usage)" -gt "${DISK_LIMIT}" ]; then
+                warn "Disk still over ${DISK_LIMIT}%. Preparing candidates for manual removal (no automatic deletion of protected volumes)."
+
+                info "Top docker volumes by size:"
+                du -sh /var/lib/docker/volumes/* | sort -h | tail -n 20
+
+                info "Images not used by containers (candidates):"
+                docker images --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.Size}}' | while read -r rep id sz; do
+                  if ! image_in_use "$id"; then
+                    echo "$rep $id $sz"
+                  fi
+                done
+
+                # Optionally remove known safe node_modules volumes that are small and rebuildable
+                SAFE_VOL_CAND=("nazarify_web_node_modules" "nazarify_api_node_modules")
+                for v in "${SAFE_VOL_CAND[@]}"; do
+                  if docker volume ls -q --filter name="^${v}$" | grep -q .; then
+                    # only remove if not mounted by any container
+                    mounted=$(docker inspect -f '{{range .Mounts}}{{.Name}} {{end}}' $(docker ps -aq) | grep -w "$v" || true)
+                    if [ -z "$mounted" ]; then
+                      info "Removing safe node_modules volume: $v"
+                      docker volume rm "$v" || warn "failed to rm volume $v"
+                    else
+                      warn "Volume $v seems mounted; skipping"
+                    fi
+                  fi
+                done
+
+                info "After candidate operations disk usage: $(get_disk_usage)%"
+                warn "If disk still > ${DISK_LIMIT}%, consider manual inspection and backup+removal of large DB volumes or increasing storage."
+              fi
+
             else
-              echo "Disk usage is $DISK_USAGE%, no pruning needed."
+              info "Disk usage is ${DISK_USAGE}%, within limit ${DISK_LIMIT}% — no prune needed."
             fi
-            
-            # ادامه فرآیند deployment
+
+            # ---------- deployment steps ----------
+            info "Proceeding with git update and compose restart..."
+            cd /srv/ariasakht
             git fetch origin
             git reset --hard origin/master
 
+            # load cached images if present (keeps deploy fast, optional)
             for IMAGE in mongo_6_0 node_20_alpine nginx_alpine; do
               if [ -f ${IMAGE}.tar ]; then
-                docker load -i ${IMAGE}.tar
+                info "Loading image ${IMAGE}.tar"
+                docker load -i ${IMAGE}.tar || warn "docker load ${IMAGE}.tar failed"
               fi
             done
 
+            info "Bringing containers down and up..."
             docker-compose -f docker-compose.production.yml down --remove-orphans
             docker-compose -f docker-compose.production.yml up -d --build
+
+            info "Final docker summary:"
+            docker system df || true
+            info "Final disk usage: $(get_disk_usage)%"
+            info "Deployment finished at $(date)"
           EOF
