@@ -31,7 +31,7 @@ jobs:
           SSH_HOST: 185.50.38.104
           DISK_LIMIT: 65
         run: |
-          ssh ${SSH_USER}@${SSH_HOST} bash -s <<'EOF'
+          ssh ${SSH_USER}@${SSH_HOST} "DISK_LIMIT=${DISK_LIMIT:-65} bash -s" <<'EOF'
             set -euo pipefail
 
             # ---------- helper ----------
