@@ -1,19 +1,19 @@
 #!/bin/bash
 
 # آدرس IP سرور که containerها روی اون پورت map شدن
-SERVER_IP="185.50.38.104"
+SERVER_IP="mongo-primary"
 
 echo "🌱 Waiting for Mongo to be ready..."
 
 # منتظر بودن برای primary
-until mongosh --host "$SERVER_IP" --port 27017 --username admin --password shantia_ariaSakht0425 --authenticationDatabase admin --eval "db.adminCommand('ping')" &>/dev/null; do
+until mongo --host "$SERVER_IP" --port 27017 --username admin --password shantia_ariaSakht0425 --authenticationDatabase admin --eval "db.adminCommand('ping')" &>/dev/null; do
   echo "⏳ Still waiting for Mongo..."
   sleep 2
 done
 
 echo "✅ Mongo is ready. Setting up replica set..."
 
-mongosh --host "$SERVER_IP" --port 27017 --username admin --password shantia_ariaSakht0425 --authenticationDatabase admin <<EOF
+mongo --host "$SERVER_IP" --port 27017 --username admin --password shantia_ariaSakht0425 --authenticationDatabase admin <<EOF
 try {
   rs.status();
   print("✅ Replica Set already initialized.");

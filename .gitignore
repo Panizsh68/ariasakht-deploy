@@ -1,2 +1,16 @@
 # .gitignore
 *.tar
+# backups
+*.bak
+*.bak2
+*.before-*
+*.old
+
+# secrets
+mongodb-keyfile
+*.key
+*.pem
+
+# env
+.env
+.env.*

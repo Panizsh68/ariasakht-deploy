@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   mongo-primary:
-    image: mongo:6.0
+    image: mongo:4.4
     container_name: mongo-primary
     ports:
       - "27017:27017"
@@ -21,7 +21,7 @@ services:
       - MONGO_INITDB_ROOT_USERNAME=admin
       - MONGO_INITDB_ROOT_PASSWORD=shantia_ariaSakht0425
     healthcheck:
-      test: ["CMD", "mongosh", "--username=admin", "--password=shantia_ariaSakht0425", "--authenticationDatabase=admin", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongo", "--username=admin", "--password=shantia_ariaSakht0425", "--authenticationDatabase=admin", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -33,7 +33,7 @@ services:
       - app-network
 
   mongo-secondary-1:
-    image: mongo:6.0
+    image: mongo:4.4
     container_name: mongo-secondary-1
     ports:
       - "27018:27017"
@@ -55,7 +55,7 @@ services:
       - app-network
 
   mongo-secondary-2:
-    image: mongo:6.0
+    image: mongo:4.4
     container_name: mongo-secondary-2
     ports:
       - "27019:27017"
@@ -77,7 +77,7 @@ services:
       - app-network
 
   mongo-init:
-    image: mongo:6.0
+    image: mongo:4.4
     container_name: mongo-init
     depends_on:
       mongo-primary:
@@ -111,16 +111,14 @@ services:
 
   backend:
     container_name: backend
-    build:
-      context: ./pre-shantia
-      dockerfile: Dockerfile
+    image: tejaris-backend:latest
     env_file:
       - ./pre-shantia/.env.production
     depends_on:
       - mongo-init
       - redis
     healthcheck:
-      test: ["CMD-SHELL", "node /app/healthcheck.js"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -136,9 +134,7 @@ services:
 
   frontend:
     container_name: frontend
-    build:
-      context: ./pre-shantia-front
-      dockerfile: Dockerfile
+    image: tejaris-frontend:latest
     env_file:
       - ./pre-shantia-front/.env.production
     deploy:
@@ -158,6 +154,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /etc/ssl/tejaris:/etc/ssl/tejaris:ro
     depends_on:
       - backend
       - frontend
