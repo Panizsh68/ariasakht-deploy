@@ -41,7 +41,7 @@ jobs:
 
             # Protected volume/name patterns (do NOT remove these)
             # Add any other volume names you want to protect here
-            PROTECT_VOL_PATTERNS=("ariasakht_mongo" "ariasakht_redis" "api_dbdata" "ops_db_data" "nazarify_db_data" "pre-shantia_mongo" "pre-shantia_redis")
+            PROTECT_VOL_PATTERNS=("tejaris_mongo" "tejaris_redis" "api_dbdata" "ops_db_data" "nazarify_db_data" "pre-shantia_mongo" "pre-shantia_redis")
 
             # Check current disk usage percentage (root fs)
             get_disk_usage() {
@@ -104,9 +104,9 @@ jobs:
                     # still referenced by a container (skip)
                     continue
                   fi
-                  # Extra safety: don't delete images with repo names matching protected patterns (e.g. "mongo", "redis", "ariasakht-*")
+                  # Extra safety: don't delete images with repo names matching protected patterns (e.g. "mongo", "redis", "tejaris-*")
                   case "$repo" in
-                    *mongo*|*redis*|*postgres*|*ariasakht*|*aria* )
+                    *mongo*|*redis*|*postgres*|*tejaris*|*aria* )
                       # protected-ish — skip
                       continue
                       ;;
@@ -168,7 +168,7 @@ jobs:
 
             # ---------- deployment steps ----------
             info "Proceeding with git update and compose restart..."
-            cd /srv/ariasakht
+            cd /srv/tejaris
             git fetch origin
             git reset --hard origin/master
 
