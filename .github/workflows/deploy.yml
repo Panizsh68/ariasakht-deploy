@@ -23,12 +23,12 @@ jobs:
 
       - name: Add server to known_hosts
         run: |
-          ssh-keyscan -H 185.50.38.104 >> ~/.ssh/known_hosts
+          ssh-keyscan -H 171.22.26.206 >> ~/.ssh/known_hosts
 
       - name: Deploy to server (safe disk management)
         env:
           SSH_USER: root
-          SSH_HOST: 185.50.38.104
+          SSH_HOST: 171.22.26.206
           DISK_LIMIT: 65
         run: |
           ssh ${SSH_USER}@${SSH_HOST} "DISK_LIMIT=${DISK_LIMIT:-65} bash -s" <<'EOF'
