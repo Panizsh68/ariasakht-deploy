@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   mongo-primary:
-    image: mongo:6.0
+    image: mongo:4.4
     container_name: mongo-primary
     ports:
       - "27017:27017"
@@ -21,7 +21,7 @@ services:
       - MONGO_INITDB_ROOT_USERNAME=admin
       - MONGO_INITDB_ROOT_PASSWORD=shantia_ariaSakht0425
     healthcheck:
-      test: ["CMD", "mongosh", "--username=admin", "--password=shantia_ariaSakht0425", "--authenticationDatabase=admin", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongo", "--username=admin", "--password=shantia_ariaSakht0425", "--authenticationDatabase=admin", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -33,7 +33,7 @@ services:
       - app-network
 
   mongo-secondary-1:
-    image: mongo:6.0
+    image: mongo:4.4
     container_name: mongo-secondary-1
     ports:
       - "27018:27017"
@@ -55,7 +55,7 @@ services:
       - app-network
 
   mongo-secondary-2:
-    image: mongo:6.0
+    image: mongo:4.4
     container_name: mongo-secondary-2
     ports:
       - "27019:27017"
@@ -77,7 +77,7 @@ services:
       - app-network
 
   mongo-init:
-    image: mongo:6.0
+    image: mongo:4.4
     container_name: mongo-init
     depends_on:
       mongo-primary:
@@ -100,7 +100,7 @@ services:
     volumes:
       - redis-data:/data
     ports:
-      - "6379:6379"
+      - "6380:6379"
     deploy:
       resources:
         limits:
@@ -135,7 +135,9 @@ services:
 
   frontend:
     container_name: frontend
-    image: tejaris-frontend:latest
+    build:
+      context: ./pre-shantia-front
+      dockerfile: Dockerfile
     env_file:
       - ./pre-shantia-front/.env.production
     deploy:
