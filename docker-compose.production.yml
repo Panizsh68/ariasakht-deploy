@@ -140,6 +140,15 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ./pre-shantia-front/.env.production
+    entrypoint: ["/bin/sh", "/usr/local/bin/frontend-entrypoint.sh"]
+    volumes:
+      - ./frontend-entrypoint.sh:/usr/local/bin/frontend-entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -159,8 +168,10 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /etc/ssl/tejaris:/etc/ssl/tejaris:ro
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
     deploy:
       resources:
         limits:
