@@ -9,6 +9,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
 
     steps:
       - name: Checkout code with submodules
@@ -17,18 +20,18 @@ jobs:
           submodules: recursive
 
       - name: Setup SSH
-        if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
+        if: ${{ env.SSH_PRIVATE_KEY != '' }}
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add server to known_hosts
-        if: ${{ secrets.SSH_PRIVATE_KEY != '' && secrets.SSH_HOST != '' }}
+        if: ${{ env.SSH_PRIVATE_KEY != '' && env.SSH_HOST != '' }}
         run: |
           ssh-keyscan -H 171.22.26.206 >> ~/.ssh/known_hosts
 
       - name: Deploy to server (safe disk management)
-        if: ${{ secrets.SSH_PRIVATE_KEY != '' && secrets.SSH_HOST != '' }}
+        if: ${{ env.SSH_PRIVATE_KEY != '' && env.SSH_HOST != '' }}
         env:
           SSH_USER: root
           SSH_HOST: 171.22.26.206
@@ -192,7 +195,7 @@ jobs:
             info "Final disk usage: $(get_disk_usage)%"
             info "Deployment finished at $(date)"
           EOF
-        - name: Skip deploy when SSH secrets missing
-          if: ${{ secrets.SSH_PRIVATE_KEY == '' || secrets.SSH_HOST == '' }}
-          run: |
-            echo "SSH_PRIVATE_KEY or SSH_HOST secret missing; skipping deploy steps to avoid failures."
+      - name: Skip deploy when SSH secrets missing
+        if: ${{ env.SSH_PRIVATE_KEY == '' || env.SSH_HOST == '' }}
+        run: |
+          echo "SSH_PRIVATE_KEY or SSH_HOST secret missing; skipping deploy steps to avoid failures."
