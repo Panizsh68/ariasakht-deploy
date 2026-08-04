@@ -20,6 +20,9 @@ server currently requires root, configure that account through separate server a
 workflow fast-forwards only a clean checkout, never removes volumes, and verifies service health after
 startup. The previous commit remains available for rollback via an explicit reviewed checkout.
 
+Shahkar identity verification is disabled when `SHAHKAR_ENABLED=false`; this is an explicit temporary
+operational mode and means signup does not perform national-ID/phone matching until the provider is configured.
+
 Health liveness is intentionally generic at `/api/health` and `/api/health/live`. Detailed readiness
 is protected by `HEALTH_READINESS_TOKEN` and returns only boolean component checks. Production Swagger is
 disabled unless `ENABLE_SWAGGER=true`; when enabled, `SWAGGER_USERNAME` and `SWAGGER_PASSWORD` are
