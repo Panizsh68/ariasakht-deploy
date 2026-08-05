@@ -114,6 +114,9 @@ services:
     build:
       context: ./pre-shantia-front
       dockerfile: Dockerfile
+      args:
+        API_BASE_URL: ${FRONTEND_API_BASE_URL:-https://tejaris.ir/api}
+        SITE_URL: ${FRONTEND_SITE_URL:-https://tejaris.ir}
     env_file: [./pre-shantia-front/.env.production]
     deploy:
       resources:
