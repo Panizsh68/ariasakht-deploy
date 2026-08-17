@@ -10,6 +10,11 @@ until mongo --host "$SERVER_HOST" --port 27017 --username "$MONGO_USERNAME" --pa
   sleep 2
 done
 
+echo "Waiting for the replica-set primary..."
+until mongo --quiet --host "$SERVER_HOST" --port 27017 --username "$MONGO_USERNAME" --password "$MONGO_PASSWORD" --authenticationDatabase admin --eval "db.isMaster().ismaster" | grep -q '^true$'; do
+  sleep 2
+done
+
 echo "Setting up replica set..."
 mongo --host "$SERVER_HOST" --port 27017 --username "$MONGO_USERNAME" --password "$MONGO_PASSWORD" --authenticationDatabase admin <<EOF
 try {
@@ -27,9 +32,10 @@ try {
   print("Replica Set Initialized.");
 }
 
-const userExists = db.getSiblingDB("admin").getUser("$MONGO_USERNAME");
+var adminDb = db.getSiblingDB("admin");
+var userExists = adminDb.getUser("$MONGO_USERNAME");
 if (!userExists) {
-  db.getSiblingDB("admin").createUser({
+  adminDb.createUser({
     user: "$MONGO_USERNAME",
     pwd: "$MONGO_PASSWORD",
     roles: [
