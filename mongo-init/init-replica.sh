@@ -10,13 +10,19 @@ until mongo --host "$SERVER_HOST" --port 27017 --username "$MONGO_USERNAME" --pa
   sleep 2
 done
 
-echo "Waiting for the replica-set primary..."
-until mongo --quiet --host "$SERVER_HOST" --port 27017 --username "$MONGO_USERNAME" --password "$MONGO_PASSWORD" --authenticationDatabase admin --eval "db.isMaster().ismaster" | grep -q '^true$'; do
+echo "Resolving the replica-set primary..."
+PRIMARY_ENDPOINT=""
+until [[ "$PRIMARY_ENDPOINT" == *:* ]]; do
+  PRIMARY_ENDPOINT="$(mongo --quiet --host "$SERVER_HOST" --port 27017 --username "$MONGO_USERNAME" --password "$MONGO_PASSWORD" --authenticationDatabase admin --eval "var primary = db.isMaster().primary; if (primary) print(primary);" 2>/dev/null | tail -n 1 || true)"
   sleep 2
 done
 
+SERVER_HOST="${PRIMARY_ENDPOINT%:*}"
+SERVER_PORT="${PRIMARY_ENDPOINT##*:}"
+echo "Replica-set primary: ${SERVER_HOST}:${SERVER_PORT}"
+
 echo "Setting up replica set..."
-mongo --host "$SERVER_HOST" --port 27017 --username "$MONGO_USERNAME" --password "$MONGO_PASSWORD" --authenticationDatabase admin <<EOF
+mongo --host "$SERVER_HOST" --port "$SERVER_PORT" --username "$MONGO_USERNAME" --password "$MONGO_PASSWORD" --authenticationDatabase admin <<EOF
 try {
   rs.status();
   print("Replica Set already initialized.");
