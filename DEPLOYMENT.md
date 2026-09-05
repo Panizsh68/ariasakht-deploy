@@ -5,10 +5,12 @@ Compose reads `production.env` from the deployment host for interpolation and re
 Use `production.env.example` and `pre-shantia/.env.example` as inventories only; never commit real values.
 
 Required application secrets include `ENCRYPTION_KEY`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`,
-`JWT_SECRET_KEY`, `REDIS_PASSWORD`, `ZIBAL_SECRET_KEY`, `PAYMENT_CALLBACK_SECRET`, and
-`HEALTH_READINESS_TOKEN`.
-JWT and callback secrets must be random and at least 32 characters. Production startup rejects empty,
+`JWT_SECRET_KEY`, `REDIS_PASSWORD`, and `HEALTH_READINESS_TOKEN`.
+Configured JWT and callback secrets must be random and at least 32 characters. Production startup rejects empty,
 default, or placeholder-like values.
+
+The installed `zibal@1.x` SDK authenticates with `ZIBAL_MERCHANT_ID`; it does not consume a
+`ZIBAL_SECRET_KEY`. The legacy variable is therefore optional and is not sent to Zibal.
 
 The MongoDB keyfile must be created and permissioned by the server administrator, then supplied through
 `MONGO_KEYFILE_PATH` (for example, a root-owned file under `/run/secrets`). No replacement keyfile is
@@ -20,8 +22,11 @@ server currently requires root, configure that account through separate server a
 workflow fast-forwards only a clean checkout, never removes volumes, and verifies service health after
 startup. The previous commit remains available for rollback via an explicit reviewed checkout.
 
-Shahkar identity verification is disabled when `SHAHKAR_ENABLED=false`; this is an explicit temporary
-operational mode and means signup does not perform national-ID/phone matching until the provider is configured.
+`SHAHKAR_ENABLED` is used only to initialize the persistent Shahkar registration-enforcement setting when
+no setting exists yet. After that, the administrator's database-backed choice is authoritative and survives
+backend restarts/container recreation. Shahkar credentials remain server-side; they are required only when
+enforcement is enabled (or when an administrator attempts to enable it). When enforcement is disabled,
+signup still requires normal national-ID validation and OTP but makes no provider request.
 
 Health liveness is intentionally generic at `/api/health` and `/api/health/live`. Detailed readiness
 is protected by `HEALTH_READINESS_TOKEN` and returns only boolean component checks. Production Swagger is
