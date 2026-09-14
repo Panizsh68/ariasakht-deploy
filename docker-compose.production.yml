@@ -91,6 +91,8 @@ services:
       context: ./pre-shantia
       dockerfile: Dockerfile
     env_file: [./pre-shantia/.env.production]
+    volumes:
+      - backend-uploads:/app/uploads
     depends_on:
       mongo-init:
         condition: service_completed_successfully
@@ -144,6 +146,7 @@ services:
     networks: [app-network]
 
 volumes:
+  backend-uploads:
   mongo-primary-data:
   mongo-secondary-1-data:
   mongo-secondary-2-data:
